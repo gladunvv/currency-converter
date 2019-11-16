@@ -1,7 +1,9 @@
 import socket
+import json
+
 
 URLS = {
-    '/': 'Hello index',
+    '/': {'HEllo': 'BUYs'},
 }
 
 
@@ -27,7 +29,7 @@ def genreate_content(code, url):
     if code == 405:
         return '<h1>Method not allowd 405</h1>'
 
-    return '<h1>{}</h1>'.format(URLS[url])
+    return json.dumps(URLS[url])
 
 
 def generate_response(request):
