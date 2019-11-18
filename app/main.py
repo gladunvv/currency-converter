@@ -1,36 +1,11 @@
 import socket
 import json
 import requests
-
-# Where USD is the base currency you want to use
-
-# Making our request
-
-
-# Your JSON object
 		
 
 URLS = {
     '/': {'RUB': '0'},
 }
-
-
-def get_currency(convert):
-
-    api_key = b66c5759f6c7452f3e98
-    
-    if 'RUB:' in convert.keys():
-        url = 'https://www.currencyconverterapi.com/api/v7/convert?q=RUB_USD&compact=ultra&apiKey={}'.format(
-            api_key,
-        )
-        response = requests.get(url)
-        data = response.json()
-        data = int(data['USD_RUB']) * convert['RUB:']
-        return data
-    #elif 'USD' in convert.keys():
-
-
-
 
 
 
