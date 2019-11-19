@@ -34,7 +34,7 @@ def api_output_currency():
 def currency_code_check(string):
     string = str(string)
     string = string.upper()
-    with open("currency_list.json", "r") as f:
+    with open("app/currency_list.json", "r") as f:
         data = json.load(f)
         result = False
         for currency in data.values():
@@ -46,7 +46,7 @@ def input_output_converter(input_currency, output_currency):
     for i in input_currency, output_currency:
         i = str(i)
         if not currency_code_check(i):
-            with open("currency_list.json", "r") as f:
+            with open("app/currency_list.json", "r") as f:
                 data = json.load(f)
 
                 for currency in data.values():
@@ -59,7 +59,7 @@ def input_output_converter(input_currency, output_currency):
 
 def get_data():
     with urllib.request.urlopen(
-        "http://data.fixer.io/api/latest?access_key=XXXXXXXXXXXXXXXXXXXXXX&format=1") as response:
+        "http://data.fixer.io/api/latest?access_key=XXXXXXXXXXXXXXXXXXXXX&format=1") as response:
         source = response.read()
     return json.loads(source)
 
