@@ -1,78 +1,117 @@
-import socket
-import json
-import requests
-		
-
-URLS = {
-    '/': {'RUB': '0'},
-}
+import flask, urllib.request, json
+from flask import request, jsonify, redirect, render_template, flash, abort
 
 
+app = flask.Flask(__name__)
+app.config["DEBUG"] = True
+app.config["SECRET_KEY"] = "it-is-secret-key"
 
 
-def main():
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,1)
-    server_socket.bind(('localhost', 8000))
-    server_socket.listen()
+def api_amount():
+    if "amount" in request.args:
+        amount = request.args["amount"]
+        amount = float(amount)
+        return amount
+    else:
+        return abort(400)
 
-    while True:
-        client_socket, addr = server_socket.accept()
-        request = client_socket.recv(1024)
-        #print(request)
-        #print()
-        #print(addr)
+def api_input_currency():
+    if "input_currency" in request.args:
+        input_currency = request.args["input_currency"]
+        input_currency = input_currency.upper()
+        return input_currency
+    else:
+        return abort(400)
 
-        response =  generate_response(request.decode('UTF-8'))
+def api_output_currency():
+    if "output_currency" in request.args:
+        output_currency = request.args["output_currency"]
+        output_currency = output_currency.upper()
+        return output_currency
+    else:
+        return abort(400)
 
-        client_socket.sendall(response)
-        client_socket.close()
+def currency_code_check(string):
+    string = str(string)
+    string = string.upper()
+    with open("currency_list.json", "r") as f:
+        data = json.load(f)
+        result = False
+        for currency in data.values():
+            if string in currency["code"]:
+                result = True
+        return result
 
-def generate_response(request):
-    method, url, convert = parse_request(request)
-    headers, code = genreate_headers(method, url)
-    body = genreate_content(code, url, convert)
-    return (headers + body).encode()
+def input_output_converter(input_currency, output_currency):
+    for i in input_currency, output_currency:
+        i = str(i)
+        if not currency_code_check(i):
+            with open("currency_list.json", "r") as f:
+                data = json.load(f)
 
-def parse_request(request):
-    parsed = request.split(' ')
-    method = parsed[0]
-    url = parsed[1]
-    res = parsed[3]
-    convert_type = parsed[2].split('\n')
-    convert_type = convert_type[1]
-    print(convert_type)
-    currency = res.split('\r')
-    convert = {convert_type: currency}
-    return method, url, convert
+                for currency in data.values():
+                    if i in currency["symbol_native"]:
+                        if i == input_currency:
+                            input_currency = currency["code"]
+                        elif i == output_currency:
+                            output_currency = currency["code"]
+    return input_currency, output_currency
 
-def genreate_headers(method, url):
+def get_data():
+    with urllib.request.urlopen(
+        "http://data.fixer.io/api/latest?access_key=XXXXXXXXXXXXXXXXXXXXXX&format=1") as response:
+        source = response.read()
+    return json.loads(source)
 
-    if not method == 'POST':
-        return ('HTTP/1.1 405 Method not allowed\n\n', 405)
+def rate_counting(input_currency, output_currency, data, amount):
+    if input_currency and output_currency in data["rates"]:
+        a, b = ((data["rates"][input_currency]), (data["rates"][output_currency]))
+        converted_amount = b / a * amount
+        return float(converted_amount)
 
-    if not url in URLS:
-        return ('HTTP/1.1 404 Not found\n\n', 404)
+def final_json(input_currency, output_currency, amount, converted_amount):
+    final_data = ({"input": {"amount": amount,
+                             "currency": input_currency},
+                   "output": {output_currency: round(converted_amount, 2)}})
+    return jsonify(final_data)
+
+@app.route("/currency_converte", methods=["GET"])
+def convert():  
+    amount = api_amount()
+    input_currency = api_input_currency()
+    output_currency = api_output_currency()
+    if output_currency != "":
+        input_currency, output_currency = input_output_converter(input_currency, output_currency)
+        data = get_data()
+        converted_amount = rate_counting(input_currency, output_currency, data, amount)
+        final_data = final_json(input_currency, output_currency, amount, converted_amount)
+        return final_data
+    else:
+        data = get_data()
+        final_data_all = all_currencies(data, input_currency, amount)
+        return final_data_all
 
 
-
-    return ('HTTP/1.1 200 OK\n\n', 200)
-
-
-def genreate_content(code, url, convert):
-    if code == 404:
-        return '<h1>404</h1><p>Page not found</p>'
-
-    if code == 405:
-        return '<h1>405</h1><p>Method not allowd</p>'
-
-    if 'RUB:' and 'USD:' not in convert.keys():
-        return json.dump({'errors': 'not found data'})
-
-    data = get_currency(convert)
-    URLS[url]['RUB'] = data
-    return json.dumps(URLS[url])    
+@app.errorhandler(400)
+def internal_error(error):
+    message = {
+        "error": "400 Bad Request",
+    }
+    return jsonify(message), 400
 
 
-if __name__ == "__main__":
-    main()
+@app.errorhandler(500)
+def internal_error(error):
+    message = {
+        "error": "500 Internal Server Error",
+    }
+    return jsonify(message), 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    message = {
+        "error": "404 Page Not Found",
+    }
+    return jsonify(message), 404
+
+app.run(debug=True)
